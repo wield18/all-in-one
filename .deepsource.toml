@@ -1,0 +1,14 @@
+version = 1
+
+[[analyzers]]
+name = "go"
+enabled = true
+
+  [analyzers.meta]
+  import_root = "github.com/wield18/all-in-one"
+  dependencies_vendored = false
+
+[[analyzers]]
+name = "test-coverage"
+enabled = true
+

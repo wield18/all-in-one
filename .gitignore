@@ -1,0 +1,7 @@
+# 忽略单个文件
+config/config.yaml
+
+# 忽略整个文件夹
+data/
+learn-go/
+my-test/
