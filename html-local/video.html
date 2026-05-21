@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>视频播放器</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+
+        .player-container {
+            background: #0f0f1a;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        video {
+            width: 960px;
+            height: 960px;
+            border-radius: 12px;
+            background: #000;
+            cursor: pointer;
+        }
+
+        .info {
+            margin-top: 16px;
+            text-align: center;
+            color: #94a3b8;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1024px) {
+            video {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 960 / 679;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="player-container">
+        <video id="videoPlayer" controls></video>
+        <div class="info" id="info">📺 准备就绪，点击播放按钮开始</div>
+    </div>
+
+    <script>
+        const video = document.getElementById('videoPlayer');
+        const info = document.getElementById('info');
+        
+        const m3u8Url = 'http://localhost:20509/video-index?index=zxc&resolution=720p&_t=' + Date.now();
+        
+        if (Hls.isSupported()) {
+            info.textContent = '🔄 正在加载视频...';
+            
+            const hls = new Hls({
+                // 修改切片请求的 URL 格式
+                loader: function(config) {
+                    return new CustomLoader(config);
+                }
+            });
+            
+            // 自定义 loader 来修改 URL 格式
+            class CustomLoader extends Hls.DefaultConfig.loader {
+                constructor(config) {
+                    super(config);
+                    const load = this.load.bind(this);
+                    this.load = function(context, config, callbacks) {
+                        // 修改 URL：将 /output0.ts?xxx 改为 /video-slice/0.ts
+                        if (context.url.includes('/output')) {
+                            // 提取数字部分
+                            const match = context.url.match(/\/output(\d+)\.ts/);
+                            if (match) {
+                                const timeNum = match[1];
+                                // 替换为新格式
+                                context.url = `http://localhost:20509/video-slice?time=${timeNum}`;
+                                console.log('修改后的切片URL:', context.url);
+                            }
+                        }
+                        load(context, config, callbacks);
+                    };
+                }
+            }
+            
+            hls.loadSource(m3u8Url);
+            hls.attachMedia(video);
+            
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error('HLS错误:', data);
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            info.textContent = '❌ 网络错误，请检查后端服务';
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            info.textContent = '❌ 视频格式错误';
+                            break;
+                        default:
+                            info.textContent = '❌ 播放失败';
+                            break;
+                    }
+                }
+            });
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                info.textContent = '✅ 视频加载成功，点击播放';
+            });
+            
+            video.addEventListener('play', () => {
+                info.textContent = '🎬 正在播放';
+            });
+            
+            video.addEventListener('pause', () => {
+                info.textContent = '⏸ 已暂停';
+            });
+            
+            video.addEventListener('ended', () => {
+                info.textContent = '🎉 播放完成';
+            });
+            
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = m3u8Url;
+            video.addEventListener('loadedmetadata', () => {
+                info.textContent = '✅ 视频加载成功，点击播放';
+            });
+        } else {
+            info.textContent = '❌ 您的浏览器不支持 HLS 播放';
+        }
+    </script>
+</body>
+</html>

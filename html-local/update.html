@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账户更新</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 560px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        h2 {
+            margin-bottom: 1rem;
+            font-size: 1.6rem;
+            color: #1e293b;
+        }
+        .options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin: 1.5rem 0 1.8rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1rem;
+        }
+        .opt-btn {
+            background: #eef2ff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: #1e293b;
+            transition: 0.2s;
+        }
+        .opt-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+        .field-group {
+            margin-bottom: 1.2rem;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: #0f172a;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            margin-top: 0.8rem;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .captcha-row {
+            display: flex;
+            gap: 10px;
+        }
+        .captcha-row input {
+            flex: 1;
+        }
+        .captcha-row button {
+            width: auto;
+            margin-top: 0;
+            padding: 0 16px;
+            background: #64748b;
+        }
+        .captcha-row button:hover {
+            background: #475569;
+        }
+        .info-note {
+            margin-top: 1.2rem;
+            font-size: 0.7rem;
+            color: #6c757d;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 1rem;
+        }
+        .error-msg {
+            color: #dc2626;
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        hr {
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>⚙️ 更新账户</h2>
+    <div class="options">
+        <button class="opt-btn" data-field="name">📛 name</button>
+        <button class="opt-btn" data-field="email">📧 email</button>
+        <button class="opt-btn" data-field="password">🔒 password</button>
+        <button class="opt-btn" data-field="status">😊 status</button>
+        <button class="opt-btn" data-field="thumbnail">🖼️ thumbnail</button>
+    </div>
+
+    <div id="dynamicFormArea">
+        <!-- 动态渲染表单的地方 -->
+        <div style="color: #6c757d; text-align: center; padding: 20px 0;">请选择要修改的字段</div>
+    </div>
+    <div class="info-note">⚠️ 控制台可查看详细响应 | 所有请求自动携带Cookie中的 user-token 和 id</div>
+</div>
+
+<script>
+    // ---------- 辅助函数 ----------
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    // 检查 cookie 并重定向
+    function checkCookieAndRedirect() {
+        const userToken = getCookie('user-token');
+        const userId = getCookie('id');
+        if (!userToken || !userId) {
+            console.warn('[更新页] 缺少user-token或id cookie, 跳转至登录页');
+            window.location.href = 'http://localhost:20508/login';
+            return false;
+        }
+        return { userToken, userId: parseInt(userId, 10) };
+    }
+
+    // 全局存储当前选中的字段 & cookie里的id数值
+    let currentField = 'name';        // 默认
+    let currentUserId = null;
+    let userTokenValue = null;
+
+    // 页面启动时校验cookie
+    const cookieValid = checkCookieAndRedirect();
+    if (!cookieValid) {
+        // 阻止后续渲染 (已经跳转)
+        throw new Error('redirect');
+    } else {
+        currentUserId = cookieValid.userId;
+        userTokenValue = cookieValid.userToken;
+        console.log(`[更新页] cookie验证通过, id=${currentUserId}, user-token=${userTokenValue}`);
+    }
+
+    // ---------- 后端交互: 发送验证码 (email 场景) ----------
+    async function sendCaptchaEmail(emailAddr) {
+        if (!emailAddr || !emailAddr.trim()) {
+            alert('请先填写有效的邮箱地址');
+            return false;
+        }
+        try {
+            const response = await fetch(`http://localhost:20509/captcha?email=${encodeURIComponent(emailAddr)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                console.log('[验证码] 发送成功', data);
+                alert(`验证码已发送至 ${emailAddr}，请查收`);
+                return true;
+            } else {
+                console.error('[验证码] 发送失败', data);
+                alert(`发送验证码失败: ${response.status}`);
+                return false;
+            }
+        } catch (err) {
+            console.error('[验证码] 网络错误', err);
+            alert('请求验证码失败，请检查后端');
+            return false;
+        }
+    }
+
+    // 通用提交: POST /update  绑定结构体 UserV1_updateTest
+    async function submitUpdate(payload) {
+        // payload 已经包含所有字段 (根据结构体默认空字符串)
+        // 额外添加 id 字段 (从cookie)
+        const finalPayload = {
+            id: currentUserId,
+            password: payload.password || "",        // 旧密码字段(用于校验)
+            captcha: payload.captcha || "",
+            "new-email": payload["new-email"] || "",
+            "new-password": payload["new-password"] || "",
+            "new-name": payload["new-name"] || "",
+            "new-status": payload["new-status"] || "",
+            "new-thumbnail": payload["new-thumbnail"] || ""
+        };
+
+        // 注意: 后端结构体标签: form:"id", form:"password", form:"captcha", form:"new-email", form:"new-password", form:"new-name", form:"new-status", form:"new-thumbnail"
+        // 使用 application/x-www-form-urlencoded 格式提交
+        const formBody = new URLSearchParams();
+        for (const [key, val] of Object.entries(finalPayload)) {
+            if (val !== undefined && val !== null) {
+                formBody.append(key, val);
+            }
+        }
+
+        try {
+            const response = await fetch('http://localhost:20509/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    // 携带 cookie 会自动带? 但后端可能额外希望 header 里也有 user-token，不过题目里只是说cookie中有user-token和id即可，
+                    // 但为了安全，我们已经在cookie存储了，浏览器会自动发送。但是显式再带一个也无妨，根据需求只依赖cookie，不用额外header.
+                },
+                credentials: 'include',   // 确保cookie发送
+                body: formBody.toString()
+            });
+
+            let responseData;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                responseData = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    responseData = JSON.parse(text);
+                } catch {
+                    responseData = { message: text };
+                }
+            }
+
+            if (response.ok) {
+                console.log('[更新成功]', responseData);
+                alert('更新成功！');
+                // 成功后可刷新或停留，无额外跳转要求，但可重置表单或清除验证码区域
+                // 如果是 email 更新成功，可重置邮箱相关输入框
+                renderFormByField(currentField);
+            } else {
+                console.error('[更新失败]', response.status, responseData);
+                alert(`更新失败 (${response.status}): ${JSON.stringify(responseData)}`);
+            }
+        } catch (err) {
+            console.error('[请求异常]', err);
+            alert('网络错误，请检查后端服务');
+        }
+    }
+
+    // ---------- 动态渲染表单 (根据选择的字段) ----------
+    function renderFormByField(field) {
+        const container = document.getElementById('dynamicFormArea');
+        if (!container) return;
+
+        // 基础模板: 每个场景生成对应的输入域 + 提交按钮
+        if (field === 'name') {
+            container.innerHTML = `
+                <div class="field-group">
+                    <label>📛 新用户名 (new-name)</label>
+                    <input type="text" id="newName" placeholder="输入新的用户名" autocomplete="off">
+                </div>
+                <button id="submitUpdateBtn">✅ 提交更新</button>
+            `;
+            const submitBtn = document.getElementById('submitUpdateBtn');
+            if (submitBtn) {
+                submitBtn.onclick = () => {
+                    const newName = document.getElementById('newName')?.value.trim() || '';
+                    if (!newName) return alert('请填写新用户名');
+                    submitUpdate({
+                        "new-name": newName,
+                        // 其他字段留空
+                        password: '',
+                        captcha: '',
+                        "new-email": '',
+                        "new-password": '',
+                        "new-status": '',
+                        "new-thumbnail": ''
+                    });
+                };
+            }
+        } 
+        else if (field === 'status') {
+            container.innerHTML = `
+                <div class="field-group">
+                    <label>😊 新状态 (new-status) - 可选: happy / sad / anxious / angry / calm</label>
+                    <input type="text" id="newStatus" placeholder="例如: happy, sad, anxious, angry, calm" autocomplete="off">
+                </div>
+                <button id="submitUpdateBtn">✅ 提交更新</button>
+            `;
+            const submitBtn = document.getElementById('submitUpdateBtn');
+            if (submitBtn) {
+                submitBtn.onclick = () => {
+                    let newStatus = document.getElementById('newStatus')?.value.trim() || '';
+                    const validStatus = ['happy', 'sad', 'anxious', 'angry', 'calm'];
+                    if (!newStatus) return alert('请填写状态');
+                    if (!validStatus.includes(newStatus)) {
+                        alert('状态必须是: happy / sad / anxious / angry / calm 其中之一');
+                        return;
+                    }
+                    submitUpdate({
+                        "new-status": newStatus,
+                        password: '',
+                        captcha: '',
+                        "new-email": '',
+                        "new-password": '',
+                        "new-name": '',
+                        "new-thumbnail": ''
+                    });
+                };
+            }
+        }
+        else if (field === 'thumbnail') {
+            container.innerHTML = `
+                <div class="field-group">
+                    <label>🖼️ 头像链接 (new-thumbnail)</label>
+                    <input type="text" id="newThumbnail" placeholder="输入头像URL或base64" autocomplete="off">
+                </div>
+                <button id="submitUpdateBtn">✅ 提交更新</button>
+            `;
+            const submitBtn = document.getElementById('submitUpdateBtn');
+            if (submitBtn) {
+                submitBtn.onclick = () => {
+                    const newThumb = document.getElementById('newThumbnail')?.value.trim() || '';
+                    if (!newThumb) return alert('请填写缩略图地址');
+                    submitUpdate({
+                        "new-thumbnail": newThumb,
+                        password: '',
+                        captcha: '',
+                        "new-email": '',
+                        "new-password": '',
+                        "new-name": '',
+                        "new-status": ''
+                    });
+                };
+            }
+        }
+        else if (field === 'email') {
+            // email 特殊: 两个输入框: 1. 新邮箱, 2. 验证码 + 发送验证码按钮
+            container.innerHTML = `
+                <div class="field-group">
+                    <label>📧 新邮箱地址 (new-email)</label>
+                    <input type="email" id="newEmailInput" placeholder="your@example.com" autocomplete="off">
+                </div>
+                <div class="field-group">
+                    <label>🔐 验证码 (captcha)</label>
+                    <div class="captcha-row">
+                        <input type="text" id="captchaInput" placeholder="6位数字验证码" maxlength="6" autocomplete="off">
+                        <button id="sendCaptchaBtn" type="button">发送验证码</button>
+                    </div>
+                </div>
+                <button id="submitUpdateBtn">✅ 提交更新</button>
+            `;
+            const sendBtn = document.getElementById('sendCaptchaBtn');
+            const newEmailInput = document.getElementById('newEmailInput');
+            if (sendBtn) {
+                sendBtn.onclick = async () => {
+                    const email = newEmailInput?.value.trim();
+                    if (!email) {
+                        alert('请先填写新邮箱');
+                        return;
+                    }
+                    if (!email.includes('@') || !email.includes('.')) {
+                        alert('请输入有效的邮箱格式');
+                        return;
+                    }
+                    await sendCaptchaEmail(email);
+                };
+            }
+            const submitBtn = document.getElementById('submitUpdateBtn');
+            if (submitBtn) {
+                submitBtn.onclick = () => {
+                    const newEmail = document.getElementById('newEmailInput')?.value.trim() || '';
+                    const captcha = document.getElementById('captchaInput')?.value.trim() || '';
+                    if (!newEmail) return alert('请填写新邮箱');
+                    if (!captcha) return alert('请输入验证码');
+                    if (!/^\d{6}$/.test(captcha)) {
+                        alert('验证码必须是6位数字');
+                        return;
+                    }
+                    submitUpdate({
+                        "new-email": newEmail,
+                        captcha: captcha,
+                        password: '',     // 旧密码字段可以为空, 但结构体里保留
+                        "new-password": '',
+                        "new-name": '',
+                        "new-status": '',
+                        "new-thumbnail": ''
+                    });
+                };
+            }
+        }
+        else if (field === 'password') {
+            // password 场景: 旧密码 + 新密码
+            container.innerHTML = `
+                <div class="field-group">
+                    <label>🔑 旧密码 (password)</label>
+                    <input type="password" id="oldPassword" placeholder="当前密码" autocomplete="off">
+                </div>
+                <div class="field-group">
+                    <label>✨ 新密码 (new-password)</label>
+                    <input type="password" id="newPassword" placeholder="新密码" autocomplete="off">
+                </div>
+                <button id="submitUpdateBtn">✅ 提交更新</button>
+            `;
+            const submitBtn = document.getElementById('submitUpdateBtn');
+            if (submitBtn) {
+                submitBtn.onclick = () => {
+                    const oldPwd = document.getElementById('oldPassword')?.value || '';
+                    const newPwd = document.getElementById('newPassword')?.value || '';
+                    if (!oldPwd) return alert('请输入旧密码');
+                    if (!newPwd) return alert('请输入新密码');
+                    if (newPwd.length < 4) alert('新密码长度建议至少4位');
+                    submitUpdate({
+                        password: oldPwd,          // 旧密码字段
+                        "new-password": newPwd,
+                        captcha: '',
+                        "new-email": '',
+                        "new-name": '',
+                        "new-status": '',
+                        "new-thumbnail": ''
+                    });
+                };
+            }
+        }
+        else {
+            container.innerHTML = `<div style="color: gray;">暂不支持此字段</div>`;
+        }
+    }
+
+    // 切换选中样式 & 重新渲染
+    function switchActiveField(field) {
+        currentField = field;
+        // 更新按钮active样式
+        document.querySelectorAll('.opt-btn').forEach(btn => {
+            const btnField = btn.getAttribute('data-field');
+            if (btnField === field) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        renderFormByField(field);
+    }
+
+    // 绑定选项按钮事件
+    function bindOptionEvents() {
+        const btns = document.querySelectorAll('.opt-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const field = btn.getAttribute('data-field');
+                if (field) switchActiveField(field);
+            });
+        });
+    }
+
+    // 页面初始化渲染默认选中 name (也可根据第一个高亮)
+    bindOptionEvents();
+    // 设置默认激活name并渲染
+    switchActiveField('name');
+
+    // 附加: 因为cookie里的user-token/id可能变更, 但无需额外操作。前端每次提交都会携带最新的cookie.
+    // 同时如果后端返回401等，不会自动跳转但会提示，符合“输出返回体”。终端会console显示。
+    // 并且如果任意请求4xx/5xx，浏览器终端输出返回体。
+    // 已实现全局fetch包装不需要，每次请求都有catch/log。
+    // 另外对于email获取验证码的GET请求也做了控制台输出。
+    console.log('[更新页] 已准备就绪，cookie中存在user-token和id, 当前userId:', currentUserId);
+</script>
+</body>
+</html>

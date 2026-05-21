@@ -146,6 +146,9 @@ func (n *Node) HandleTwoLeafV() error {
 	if width > n.MaxWidth {
 		left.Scale, right.Scale = left.Scale*n.MaxWidth/width, right.Scale*n.MaxWidth/width
 	}
+	if left.Height > right.Height {
+		n.MaxHeight = left.Height * left.Scale
+	}
 	return nil
 }
 
@@ -157,6 +160,9 @@ func (n *Node) HandleTwoLeafH() error {
 	if height > n.MaxHeight {
 		left.Scale, right.Scale = left.Scale*n.MaxHeight/height, right.Scale*n.MaxHeight/height
 	}
+	if left.Width > right.Width {
+		n.MaxWidth = left.Width * left.Scale
+	}
 	return nil
 }
 
@@ -166,13 +172,27 @@ func (n *Node) HandleLeftLeafV(left, right *Node) error {
 
 	left.Scale = n.MaxHeight / left.Height
 	// 左叶子最大有1/rightCount + Base
+	// 这不能根据count来决定scale吧
 	maxScale := 1.0/(float64(rightCount)+1.0) + base
 	if left.Scale > maxScale {
 		left.Scale = maxScale
 	}
 	right.MaxWidth = n.MaxWidth - left.Scale*left.Width // 剩下的都给子节点
 	right.MaxHeight = n.MaxHeight
-	return right.OptimizeLayout()
+	err := right.OptimizeLayout()
+	if err != nil {
+		return err
+	}
+	// 在右边先优化完
+	// 获得右边的宽度
+	// 来获得左边的最大显示
+	if n.MaxWidth-right.MaxWidth > left.Scale*left.Width { // 有剩余空间,先占满最大宽度,高度判断
+		left.Scale = (n.MaxWidth - right.MaxWidth) / left.Width // 这是占满
+	}
+	if left.Height*left.Scale > n.MaxHeight {
+		left.Scale = n.MaxHeight / left.Height // 再满足最大高度限制
+	}
+	return nil
 }
 
 func (n *Node) HandleLeftLeafH(left, right *Node) error {
@@ -184,7 +204,24 @@ func (n *Node) HandleLeftLeafH(left, right *Node) error {
 	}
 	right.MaxHeight = n.MaxHeight - left.Scale*left.Height // 剩下的都给子节点
 	right.MaxWidth = n.MaxWidth
-	return right.OptimizeLayout()
+	err := right.OptimizeLayout()
+	if err != nil {
+		return err
+	}
+	// 高度限制优先
+	// if n.MaxWidth-right.MaxWidth > left.Scale*left.Width { // 有剩余空间,先占满最大宽度,高度判断
+	// 	left.Scale = (n.MaxWidth - right.MaxWidth) / left.Width // 这是占满
+	// }
+	// if left.Height*left.Scale > n.MaxHeight {
+	// 	left.Scale = n.MaxHeight / left.Height // 再满足最大高度限制
+	// }
+	if n.MaxHeight-right.Height > left.Scale*left.Width {
+		left.Scale = (n.MaxHeight - right.MaxHeight) / left.Height
+	}
+	if left.Width*left.Scale > n.MaxWidth {
+		left.Scale = n.MaxWidth / left.Width
+	}
+	return nil
 }
 
 func (n *Node) HandleTwoNodeV(left, right *Node) error {

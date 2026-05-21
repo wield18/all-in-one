@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注销账户</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 450px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 { margin-bottom: 1rem; color: #333; }
+        .field-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .captcha-row {
+            display: flex;
+            gap: 10px;
+        }
+        .captcha-row input {
+            flex: 1;
+        }
+        .captcha-row button {
+            width: auto;
+            padding: 8px 16px;
+            background: #64748b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .captcha-row button:hover {
+            background: #475569;
+        }
+        button[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        button[type="submit"]:hover {
+            background: #dc2626;
+        }
+        .info {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>⚠️ 注销账户</h2>
+    <p style="margin-bottom: 1rem; font-size: 0.85rem; color: #999;">此操作不可逆，请谨慎</p>
+
+    <div class="field-group">
+        <label>🔑 密码</label>
+        <input type="password" id="password" placeholder="请输入密码" autocomplete="off">
+    </div>
+
+    <div class="field-group">
+        <label>📧 邮箱</label>
+        <input type="email" id="email" placeholder="your@example.com" autocomplete="off">
+    </div>
+
+    <div class="field-group">
+        <label>🔐 验证码</label>
+        <div class="captcha-row">
+            <input type="text" id="captcha" placeholder="6位数字验证码" maxlength="6" autocomplete="off">
+            <button id="sendCaptchaBtn">发送验证码</button>
+        </div>
+    </div>
+
+    <button id="submitBtn">确认注销账户</button>
+    <div class="info">⚠️ 操作结果请在控制台查看 (F12)</div>
+</div>
+
+<script>
+    // 获取cookie
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    // 检查cookie并重定向
+    function checkCookieAndRedirect() {
+        const userToken = getCookie('user-token');
+        const userId = getCookie('id');
+        if (!userToken || !userId) {
+            console.warn('[注销页] 缺少user-token或id cookie, 跳转至登录页');
+            window.location.href = 'http://localhost:20509/login';
+            return false;
+        }
+        return { userToken, userId: parseInt(userId, 10) };
+    }
+
+    const cookieValid = checkCookieAndRedirect();
+    if (!cookieValid) {
+        throw new Error('redirect');
+    }
+
+    const userId = cookieValid.userId;
+    const userToken = cookieValid.userToken;
+    console.log(`[注销页] cookie验证通过, id=${userId}, user-token=${userToken}`);
+
+    // 发送验证码
+    async function sendCaptcha(email) {
+        if (!email || !email.trim()) {
+            console.warn('[验证码] 邮箱为空');
+            return;
+        }
+        if (!email.includes('@') || !email.includes('.')) {
+            console.warn('[验证码] 邮箱格式无效:', email);
+            return;
+        }
+        try {
+            console.log(`[验证码] 发送到 ${email}`);
+            const response = await fetch(`http://localhost:20509/captcha?email=${encodeURIComponent(email)}`, {
+                method: 'GET',
+            });
+            const text = await response.text();
+            if (response.ok) {
+                console.log('[验证码] 发送成功:', text);
+            } else {
+                console.error('[验证码] 发送失败', response.status, text);
+            }
+        } catch (err) {
+            console.error('[验证码] 网络错误', err);
+        }
+    }
+
+    // 提交注销请求
+    async function deleteAccount() {
+        const password = document.getElementById('password')?.value || '';
+        const email = document.getElementById('email')?.value || '';
+        const captcha = document.getElementById('captcha')?.value || '';
+
+        if (!password) {
+            console.warn('[注销] 密码为空');
+            return;
+        }
+        if (!email) {
+            console.warn('[注销] 邮箱为空');
+            return;
+        }
+        if (!captcha) {
+            console.warn('[注销] 验证码为空');
+            return;
+        }
+        if (!/^\d{6}$/.test(captcha)) {
+            console.warn('[注销] 验证码格式错误，需要6位数字');
+            return;
+        }
+
+        const formBody = new URLSearchParams();
+        formBody.append('id', userId);
+        formBody.append('password', password);
+        formBody.append('email', email);
+        formBody.append('captcha', captcha);
+
+        console.log('[注销] 提交数据:', { id: userId, password: '***', email, captcha });
+
+        try {
+            const response = await fetch('http://localhost:20509/Delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'user-token': userToken,
+                },
+                credentials: 'include',
+                body: formBody.toString()
+            });
+
+            const text = await response.text();
+            if (response.ok) {
+                console.log('[注销] 响应:', text);
+                if (text === 'ok') {
+                    console.log('[注销] 成功，跳转至 localhost:20509/');
+                    window.location.href = 'http://localhost:20509/';
+                } else {
+                    console.warn('[注销] 返回非ok:', text);
+                }
+            } else {
+                console.error('[注销] 请求失败', response.status, text);
+            }
+        } catch (err) {
+            console.error('[注销] 网络错误', err);
+        }
+    }
+
+    // 绑定事件
+    document.getElementById('sendCaptchaBtn').addEventListener('click', () => {
+        const email = document.getElementById('email')?.value || '';
+        sendCaptcha(email);
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', deleteAccount);
+</script>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>多视频播放器 - 空格刷新 | 全屏智能控制</title>
+    <style>
+        /* 极简重置：保证视频容器能正确响应全屏 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* 容器由后端动态生成，我们不做额外样式干扰 */
+    </style>
+</head>
+<body style="margin: 0px">
+    
+
+    <script>
+        // ---------- 全局状态 ----------
+        let currentVideos = [];           // 当前页面中所有的 <video> 元素
+        let soundActivated = false;        // 是否已经开启过声音（全局一次）
+        let globalClickHandler = null;      // 全局点击激活声音的处理器
+        let fullscreenObserverActive = false; // 是否已监听全屏变化
+
+        // ---------- 核心：获取后端视频布局（空格 或 初始加载）----------
+        function fetchAndReplaceVideos() {
+            const url = `http://localhost:20509/random-videos?height=${window.innerHeight}&width=${window.innerWidth}`;
+            
+            return fetch(url)
+                .then(response => response.text())
+                .then(template => {
+                    // 处理可能被 JSON 序列化的问题（兼容后端用 c.JSON 返回带引号的字符串）
+                    let htmlString = template;
+                    try {
+                        if (htmlString.trim().startsWith('"')) {
+                            htmlString = JSON.parse(htmlString);
+                        }
+                    } catch (e) {
+                        console.warn("JSON转义解析失败，直接使用原始内容", e);
+                    }
+                    
+                    // 替换整个 body 内容
+                    document.body.innerHTML = htmlString;
+                    
+                    // 重要: 替换后需要重新绑定全屏事件、收集视频元素、恢复音量/播放状态
+                    reinitAfterDomUpdate();
+                    
+                    // 如果声音尚未激活，确保所有新视频静音自动播放；
+                    // 如果声音已经激活过，则直接让新视频取消静音并播放
+                    if (soundActivated) {
+                        // 用户已经点过页面开启声音了，新加载的视频也应该直接有声音
+                        activateSoundOnAllVideos();
+                    } else {
+                        // 还未激活声音: 保证静音播放，等待全局点击
+                        ensureMutedAutoPlay();
+                    }
+                    
+                    console.log("视频布局已刷新 (空格触发或初始化)");
+                })
+                .catch(error => {
+                    console.error('获取视频布局失败:', error);
+                    document.body.innerHTML = '<div style="color:red; text-align:center; margin-top:50px;">加载失败，请检查后端服务<br>可尝试刷新页面</div>';
+                });
+        }
+
+        // ---------- DOM 更新后重新收集视频元素 & 绑定全屏监听 ----------
+        function reinitAfterDomUpdate() {
+            // 重新收集所有视频元素
+            currentVideos = Array.from(document.querySelectorAll('video'));
+            
+            // 确保每个视频拥有 loop 循环 (属性保证，但以防万一)
+            currentVideos.forEach(video => {
+                if (!video.hasAttribute('loop')) {
+                    video.setAttribute('loop', '');
+                }
+                // 额外保险：监听 ended 事件强制循环（防止某些浏览器 loop 属性不生效）
+                video.removeEventListener('ended', handleVideoEnded);   // 避免重复绑定
+                video.addEventListener('ended', handleVideoEnded);
+            });
+            
+            // 重新绑定全屏变化监听 (只在全局绑定一次，但为了避免重复，检查)
+            if (!fullscreenObserverActive) {
+                document.addEventListener('fullscreenchange', onFullScreenChange);
+                document.addEventListener('webkitfullscreenchange', onFullScreenChange);
+                document.addEventListener('mozfullscreenchange', onFullScreenChange);
+                document.addEventListener('MSFullscreenChange', onFullScreenChange);
+                fullscreenObserverActive = true;
+            }
+            
+            // 检查当前是否已经处于全屏模式 (例如按F11或之前遗留全屏)
+            // 但要延迟一下等浏览器稳定
+            setTimeout(() => {
+                checkFullscreenAndControlPlayback();
+            }, 100);
+        }
+        
+        // ended 事件处理器：保证循环 (如果 loop 属性失效)
+        function handleVideoEnded(e) {
+            const video = e.target;
+            if (video.loop === false && !video.hasAttribute('loop')) {
+                // 如果 loop 被意外移除，重新播放
+                video.currentTime = 0;
+                video.play().catch(err => console.log("循环播放重试:", err.message));
+            }
+        }
+        
+        // ---------- 全屏变化时: 除了全屏的视频，其他全部中断/恢复 ----------
+        function onFullScreenChange() {
+            // 延迟一小段时间等待全屏状态稳定
+            setTimeout(() => {
+                checkFullscreenAndControlPlayback();
+            }, 80);
+        }
+        
+        function checkFullscreenAndControlPlayback() {
+            // 获取当前全屏元素
+            const fullscreenElement = document.fullscreenElement || 
+                                       document.webkitFullscreenElement || 
+                                       document.mozFullScreenElement || 
+                                       document.msFullscreenElement;
+            
+            if (fullscreenElement && fullscreenElement.tagName === 'VIDEO') {
+                // 有视频处于全屏状态 -> 暂停其他所有非全屏视频
+                const fullscreenVideo = fullscreenElement;
+                currentVideos.forEach(video => {
+                    if (video !== fullscreenVideo) {
+                        // 暂停其他视频
+                        if (!video.paused) {
+                            video.pause();
+                        }
+                    } else {
+                        // 全屏的这个视频确保在播放 (有时候全屏并不会影响播放状态)
+                        if (video.paused && video.readyState >= 2) {
+                            video.play().catch(e => console.log("全屏视频恢复播放失败", e));
+                        }
+                    }
+                });
+            } else {
+                // 没有全屏视频 (退出全屏后) -> 恢复所有视频播放
+                currentVideos.forEach(video => {
+                    if (video.paused) {
+                        // 如果处于暂停状态则恢复播放
+                        video.play().catch(e => console.log("退出全屏后恢复播放失败", e));
+                    }
+                });
+            }
+        }
+        
+        // ---------- 音量/自动播放相关 ----------
+        // 确保所有视频静音自动播放 (初次加载或声音未激活时)
+        function ensureMutedAutoPlay() {
+            currentVideos.forEach(video => {
+                video.muted = true;
+                video.volume = 1.0;   // 预留音量，取消静音时生效
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => {
+                        console.warn(`静音自动播放受阻: ${err.message}`);
+                        // 极少数情况仍可能被阻止，但用户点击页面后会主动激活
+                    });
+                }
+            });
+        }
+        
+        // 激活所有视频声音 (取消静音并保证播放)
+        function activateSoundOnAllVideos() {
+            if (!currentVideos.length) return;
+            let anyPlayError = false;
+            currentVideos.forEach(video => {
+                video.muted = false;
+                video.volume = 1.0;
+                if (video.paused) {
+                    video.play().catch(err => {
+                        anyPlayError = true;
+                        console.warn("激活声音时播放失败", err);
+                    });
+                }
+            });
+            if (!anyPlayError) {
+                console.log("所有视频声音已开启，正在播放");
+            } else {
+                console.log("部分视频声音开启，但尝试播放恢复");
+            }
+        }
+        
+        // 全局点击激活声音 (仅第一次任意点击)
+        function setupGlobalSoundActivator() {
+            if (soundActivated) return;
+            
+            const activate = () => {
+                if (soundActivated) return;
+                soundActivated = true;
+                activateSoundOnAllVideos();
+                // 移除监听，只需一次
+                if (globalClickHandler) {
+                    document.removeEventListener('click', globalClickHandler);
+                    document.removeEventListener('touchstart', globalClickHandler);
+                }
+                // 移除提示浮层 (如果存在)
+                const tip = document.getElementById('global-sound-tip');
+                if (tip) tip.remove();
+                console.log("全局声音已激活 (用户点击页面)");
+            };
+            
+            globalClickHandler = activate;
+            document.addEventListener('click', globalClickHandler);
+            document.addEventListener('touchstart', globalClickHandler);
+            
+            // 添加一个不干扰的不浮层提示 (极简)
+            if (!document.getElementById('global-sound-tip')) {
+                const tip = document.createElement('div');
+                tip.id = 'global-sound-tip';
+                tip.textContent = '🔊 点击页面任意位置，开启所有视频声音';
+                tip.style.position = 'fixed';
+                tip.style.bottom = '20px';
+                tip.style.left = '20px';
+                tip.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                tip.style.color = '#fff';
+                tip.style.padding = '6px 14px';
+                tip.style.borderRadius = '28px';
+                tip.style.fontFamily = 'system-ui, sans-serif';
+                tip.style.fontSize = '14px';
+                tip.style.zIndex = '9999';
+                tip.style.pointerEvents = 'none';
+                tip.style.backdropFilter = 'blur(4px)';
+                document.body.appendChild(tip);
+                // 10秒后自动淡去的计时器
+                setTimeout(() => {
+                    if (tip && tip.parentNode && !soundActivated) {
+                        tip.style.opacity = '0.5';
+                    } else if (tip && tip.parentNode) {
+                        tip.remove();
+                    }
+                }, 10000);
+            }
+        }
+        
+        // ---------- 空格键监听 ----------
+        function setupSpacebarListener() {
+            window.addEventListener('keydown', (e) => {
+                // 检查按下的键是否为空格 (keyCode 32 或 key = ' ')
+                if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+                    e.preventDefault();   // 阻止页面滚动
+                    // 发送请求，重新获取视频布局 (保持循环播放和新视频)
+                    fetchAndReplaceVideos().catch(err => {
+                        console.error("空格刷新失败", err);
+                    });
+                }
+            });
+        }
+        
+        // ---------- 保证全屏状态变化时音频/视频状态的一致性 ----------
+        // 额外：当用户从全屏视频退出后，如果声音已开启，确保全部播放；如果声音没开启，仍保持静音播放
+        // 在 checkFullscreenAndControlPlayback 中已经做了：退出全屏后会调用 video.play()
+        // 但需要顾虑声音激活状态：未激活时播放也是静音，不影响用户体验
+        
+        // 优化退出全屏后及时恢复循环播放队列
+        function enhanceFullscreenExitResume() {
+            // 监听全屏离开后，如果有视频因为全屏时暂停了，确保他们恢复 (已经由checkFullscreenAndControlPlayback实现)
+            // 但是由于全屏视频可能设置了自动播放策略, 需要确保声音标志依然可用
+            const origCheck = checkFullscreenAndControlPlayback;
+            window.checkFullscreenAndControlPlayback = function() {
+                origCheck();
+                // 如果声音已经激活，再次确保非全屏视频取消静音（理论上他们已经是muted==false, 但可能由于状态漂移）
+                if (soundActivated) {
+                    currentVideos.forEach(video => {
+                        video.muted = false;
+                    });
+                }
+            };
+        }
+        
+        // ---------- 初始化入口 ----------
+        function init() {
+            // 首次加载视频布局
+            fetchAndReplaceVideos()
+                .then(() => {
+                    // 设置全局点击开启声音（只需一次）
+                    setupGlobalSoundActivator();
+                    // 设置空格监听
+                    setupSpacebarListener();
+                    // 增强全屏退出恢复
+                    enhanceFullscreenExitResume();
+                })
+                .catch(err => {
+                    console.error("初始加载失败", err);
+                    document.body.innerHTML = '<div style="color:white; text-align:center; padding:40px;">无法连接到后端服务，请确保 localhost:20509 可用</div>';
+                });
+        }
+        
+        // 当页面完全加载后启动
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

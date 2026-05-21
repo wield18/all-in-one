@@ -3,18 +3,35 @@ package config
 
 import (
 	_ "embed"
+	"time"
 
 	"go.yaml.in/yaml/v2"
 )
 
+// 全局暴露Config
+var config = &Config{}
+
+func GetConfig() *Config {
+	return config
+}
+
 // 总配文件
-type config struct {
+type Config struct {
 	Server   Server   `yaml:"server"`
 	Mysql    Mysql    `yaml:"mysql"`
 	Redis    Redis    `yaml:"redis"`
 	Rocket   Rocket   `yaml:"rocket"`
 	ES       ES       `yaml:"es"`
 	Template Template `yaml:"template"`
+	QQ       QQ       `yaml:"qq"`
+	Pool     Pool     `yaml:"pool"`
+}
+
+type QQ struct {
+	From     string `yaml:"from"`
+	Password string `yaml:"password"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
 }
 
 // key-pair
@@ -54,6 +71,13 @@ type Redis struct {
 	PoolSize int    `yaml:"poolSize"`
 }
 
+type Pool struct {
+	QueueSize     int           `yaml:"queueSize"`
+	CorGo         int           `yaml:"corGo"`
+	MaxGo         int           `yaml:"maxGo"`
+	MaxIdleGoTime time.Duration `yaml:"maxIdleGoTime"`
+}
+
 type ES struct {
 	Addresses []string `yaml:"addresses"`
 	Username  string   `yaml:"username"`
@@ -90,12 +114,10 @@ type Template struct {
 //go:embed config.yaml
 var configData []byte
 
-var Config = &config{}
-
 // 配置初始化 改成手动调用
 func init() {
 	// 绑定值
-	err := yaml.Unmarshal(configData, Config)
+	err := yaml.Unmarshal(configData, config)
 	if err != nil {
 		panic(err)
 	}

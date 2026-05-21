@@ -193,6 +193,7 @@ func GenerateVideoTemplate(h, w float64) string {
 	vCount, _ := strconv.ParseInt(string(cutNodeKey[2]), 10, 64)
 	hVideoCount := int(hCount)
 	vVideoCount := int(vCount)
+	fmt.Println("hVideoCount: ", hVideoCount, "vVideoCount: ", vVideoCount)
 	var err error
 	if hVideoCount != 0 {
 		hInfos, err = video.GetRandomVideoFromSlice((videoInfos_map[H]), hVideoCount)

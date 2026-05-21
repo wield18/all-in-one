@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>用户注册 - 基础表单</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f1f5f9;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+        }
+
+        /* 基础卡片容器 */
+        .register-card {
+            max-width: 480px;
+            width: 100%;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+            padding: 2rem 1.8rem 2.2rem;
+            transition: all 0.2s ease;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        .sub {
+            color: #475569;
+            font-size: 0.85rem;
+            margin-bottom: 1.8rem;
+            border-left: 3px solid #94a3b8;
+            padding-left: 0.75rem;
+        }
+
+        /* 表单组 */
+        .form-group {
+            margin-bottom: 1.35rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #1e293b;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .label-extra {
+            font-weight: normal;
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        /* 输入框和按钮组合 */
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            background-color: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            transition: 0.15s;
+            background: #ffffff;
+        }
+        .input-wrapper:focus-within {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+
+        .input-wrapper input {
+            flex: 1;
+            border: none;
+            padding: 0.7rem 0.9rem;
+            font-size: 0.95rem;
+            background: transparent;
+            outline: none;
+            border-radius: 0.75rem;
+            color: #0f172a;
+        }
+
+        .input-wrapper input::placeholder {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+
+        /* 密码可见切换按钮 */
+        .toggle-pwd {
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 0 0.8rem 0 0;
+            color: #5b6e8c;
+            transition: color 0.1s;
+            font-weight: 500;
+        }
+        .toggle-pwd:hover {
+            color: #1e40af;
+        }
+
+        /* 邮箱行单独组合: 邮箱输入框 + 验证码按钮 特殊布局 */
+        .email-group {
+            display: flex;
+            gap: 0.65rem;
+            align-items: center;
+        }
+        .email-group .input-wrapper {
+            flex: 2;
+        }
+        .captcha-btn {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 2rem;
+            padding: 0 1rem;
+            height: 42px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #1e293b;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            background-color: white;
+        }
+        .captcha-btn:hover:not(:disabled) {
+            background-color: #eef2ff;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        .captcha-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #e2e8f0;
+        }
+
+        /* 普通文本输入框独立样式（非wrapper场景保留一致性） */
+        .plain-input {
+            width: 100%;
+            padding: 0.7rem 0.9rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: 0.15s;
+            background: white;
+        }
+        .plain-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+
+        /* 注册按钮 */
+        .register-btn {
+            width: 100%;
+            background-color: #0f172a;
+            color: white;
+            border: none;
+            padding: 0.8rem 0;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 2rem;
+            margin-top: 1rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.05s;
+            letter-spacing: 0.3px;
+        }
+        .register-btn:hover:not(:disabled) {
+            background-color: #1e293b;
+        }
+        .register-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 简单消息反馈区域(控制台为主，但可显示临时tip) */
+        .toast-msg {
+            margin-top: 1.2rem;
+            font-size: 0.75rem;
+            text-align: center;
+            color: #475569;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 1rem;
+        }
+
+        hr {
+            margin: 0.5rem 0;
+            border: none;
+            border-top: 1px solid #eef2ff;
+        }
+
+        /* 辅助文本 */
+        .field-note {
+            font-size: 0.7rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+<div class="register-card">
+    <h1>创建账户</h1>
+    <div class="sub">填写信息完成注册</div>
+
+    <form id="registerForm" method="post">
+        <!-- 1. Name 字段 -->
+        <div class="form-group">
+            <label>姓名 <span class="label-extra">(必填)</span></label>
+            <input type="text" id="name" name="name" class="plain-input" placeholder="请输入姓名" autocomplete="off" required>
+        </div>
+
+        <!-- 2. Password 字段 + toggle显示 -->
+        <div class="form-group">
+            <label>密码 <span class="label-extra">(必填)</span></label>
+            <div class="input-wrapper">
+                <input type="password" id="password" name="password" placeholder="请输入密码" autocomplete="off" required>
+                <button type="button" class="toggle-pwd" id="togglePasswordBtn" aria-label="显示/隐藏密码">👁️</button>
+            </div>
+        </div>
+
+        <!-- 3. Email 字段 + 右侧获取验证码按钮 -->
+        <div class="form-group">
+            <label>电子邮箱 <span class="label-extra">(用于接收验证码)</span></label>
+            <div class="email-group">
+                <div class="input-wrapper">
+                    <input type="email" id="email" name="email" placeholder="your@example.com" autocomplete="off" required>
+                </div>
+                <button type="button" id="getCaptchaBtn" class="captcha-btn">获取验证码</button>
+            </div>
+        </div>
+
+        <!-- 4. Captcha 验证码字段 -->
+        <div class="form-group">
+            <label>验证码 <span class="label-extra">(6位数字)</span></label>
+            <input type="text" id="captcha" name="captcha" class="plain-input" placeholder="请输入邮箱收到的验证码" autocomplete="off" required>
+        </div>
+
+        <button type="submit" id="submitRegisterBtn" class="register-btn">立即注册</button>
+        <div class="toast-msg" id="formMessage">所有字段填写后即可注册，验证码冷却60秒</div>
+    </form>
+</div>
+
+<script>
+    // 获取DOM元素
+    const nameInput = document.getElementById('name');
+    const passwordInput = document.getElementById('password');
+    const emailInput = document.getElementById('email');
+    const captchaInput = document.getElementById('captcha');
+    const getCaptchaBtn = document.getElementById('getCaptchaBtn');
+    const registerForm = document.getElementById('registerForm');
+    const submitBtn = document.getElementById('submitRegisterBtn');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+
+    // 辅助显示简单提示（仅在控制台和底部文本区做轻提示）
+    const messageDiv = document.getElementById('formMessage');
+    function setMessage(msg, isError = false) {
+        if (messageDiv) {
+            messageDiv.textContent = msg;
+            messageDiv.style.color = isError ? '#b91c1c' : '#2c6e2f';
+            setTimeout(() => {
+                if (messageDiv.textContent === msg) {
+                    messageDiv.style.color = '#475569';
+                    if(!isError) messageDiv.textContent = '所有字段填写后即可注册，验证码冷却60秒';
+                }
+            }, 3000);
+        }
+        // 同时输出到控制台
+        if (isError) console.error(`[前端提示] ${msg}`);
+        else console.log(`[前端提示] ${msg}`);
+    }
+
+    // ---------- 1. 密码显示/隐藏toggle逻辑 ----------
+    let isPasswordVisible = false;
+    togglePasswordBtn.addEventListener('click', () => {
+        isPasswordVisible = !isPasswordVisible;
+        passwordInput.type = isPasswordVisible ? 'text' : 'password';
+        togglePasswordBtn.textContent = isPasswordVisible ? '🙈' : '👁️';
+        // 增加一点基础反馈
+        togglePasswordBtn.style.transform = 'scale(0.95)';
+        setTimeout(() => { togglePasswordBtn.style.transform = ''; }, 100);
+    });
+
+    // ---------- 2. 验证码冷却 60s 逻辑 ----------
+    let canRequestCaptcha = true;
+    let countdownTimer = null;
+    let remainingSeconds = 0;
+
+    // 更新按钮文字与禁用状态
+    function updateCaptchaButtonState() {
+        if (!canRequestCaptcha && remainingSeconds > 0) {
+            getCaptchaBtn.disabled = true;
+            getCaptchaBtn.textContent = `请等待 ${remainingSeconds}s`;
+        } else {
+            getCaptchaBtn.disabled = false;
+            getCaptchaBtn.textContent = '获取验证码';
+        }
+    }
+
+    function startCooldown(seconds = 60) {
+        if (countdownTimer) clearInterval(countdownTimer);
+        canRequestCaptcha = false;
+        remainingSeconds = seconds;
+        updateCaptchaButtonState();
+
+        countdownTimer = setInterval(() => {
+            if (remainingSeconds <= 1) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                canRequestCaptcha = true;
+                remainingSeconds = 0;
+                updateCaptchaButtonState();
+            } else {
+                remainingSeconds--;
+                updateCaptchaButtonState();
+            }
+        }, 1000);
+    }
+
+    // 发送验证码请求 GET: localhost:20509/captcha?email=xxx
+    async function requestCaptcha(emailValue) {
+        if (!emailValue || emailValue.trim() === '') {
+            setMessage('❌ 请先填写邮箱地址再获取验证码', true);
+            return false;
+        }
+        // 简单邮箱格式预检（前端轻量校验，但后端也有 validate:"required,email"）
+        const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+        if (!emailRegex.test(emailValue)) {
+            setMessage('❌ 邮箱格式无效，请填写正确的电子邮箱', true);
+            return false;
+        }
+
+        try {
+            const url = `http://localhost:20509/captcha?email=${encodeURIComponent(emailValue)}`;
+            console.log(`[请求验证码] GET ${url}`);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json', // 希望返回json结构体
+                },
+            });
+            // 读取响应体 (文本或json)
+            const responseText = await response.text();
+            let prettyResponse = responseText;
+            try {
+                const jsonObj = JSON.parse(responseText);
+                prettyResponse = JSON.stringify(jsonObj);
+            } catch(e) { /* 保留原始文本 */ }
+            
+            // 输出返回体到终端（控制台）
+            console.log(`[验证码响应] 状态码: ${response.status} | 返回体: ${prettyResponse}`);
+            
+            if (response.ok) {
+                setMessage(`✅ 验证码已发送至 ${emailValue} ，请查收 (60秒冷却)`);
+                startCooldown(60);
+                return true;
+            } else {
+                setMessage(`⚠️ 获取验证码失败: HTTP ${response.status} , 详情查看控制台`, true);
+                return false;
+            }
+        } catch (err) {
+            console.error(`[验证码请求异常]`, err);
+            setMessage(`❌ 网络错误: ${err.message}, 请检查后端服务是否启动`, true);
+            return false;
+        }
+    }
+
+    // 点击获取验证码按钮的处理
+    getCaptchaBtn.addEventListener('click', async () => {
+        if (!canRequestCaptcha) {
+            setMessage(`请等待 ${remainingSeconds} 秒后再尝试获取验证码`, true);
+            return;
+        }
+        const email = emailInput.value.trim();
+        if (!email) {
+            setMessage('❌ 请先填写邮箱地址', true);
+            emailInput.focus();
+            return;
+        }
+        // 简单校验邮箱格式
+        const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setMessage('❌ 邮箱格式错误，例如: name@example.com', true);
+            emailInput.focus();
+            return;
+        }
+        // 调用发送验证码
+        await requestCaptcha(email);
+    });
+
+    // ---------- 3. 注册表单提交 ----------
+    // 检查所有四个输入框是否有值（简单非空校验，与后端 validate 呼应，增强体验）
+    function isAllFieldsFilled() {
+        const nameVal = nameInput.value.trim();
+        const pwdVal = passwordInput.value.trim();
+        const emailVal = emailInput.value.trim();
+        const captchaVal = captchaInput.value.trim();
+        return !!(nameVal && pwdVal && emailVal && captchaVal);
+    }
+
+    // 实时控制注册按钮禁用/启用（简单UX，全填满才可点）
+    function updateRegisterButtonState() {
+        if (isAllFieldsFilled()) {
+            submitBtn.disabled = false;
+        } else {
+            submitBtn.disabled = true;
+        }
+    }
+
+    // 监听所有输入框变化
+    const allInputs = [nameInput, passwordInput, emailInput, captchaInput];
+    allInputs.forEach(inp => {
+        inp.addEventListener('input', () => {
+            updateRegisterButtonState();
+        });
+        inp.addEventListener('blur', () => {
+            updateRegisterButtonState();
+        });
+    });
+
+    // 表单提交处理 (post: localhost:20509/register)
+    registerForm.addEventListener('submit', async (event) => {
+        event.preventDefault();  // 阻止传统提交
+
+        // 再次确保全字段有效
+        if (!isAllFieldsFilled()) {
+            setMessage('请完整填写姓名、密码、邮箱和验证码', true);
+            return;
+        }
+
+        // 组装表单数据 (application/x-www-form-urlencoded 风格，结构与 form 标签一致)
+        const formData = new URLSearchParams();
+        formData.append('name', nameInput.value.trim());
+        formData.append('password', passwordInput.value);
+        formData.append('email', emailInput.value.trim());
+        formData.append('captcha', captchaInput.value.trim());
+
+        // 禁用提交按钮防止重复请求
+        submitBtn.disabled = true;
+        const originalBtnText = submitBtn.textContent;
+        submitBtn.textContent = '注册中...';
+
+        try {
+            const postUrl = 'http://localhost:20509/register';
+            console.log(`[注册请求] POST ${postUrl} 参数:`, Object.fromEntries(formData.entries()));
+            
+            const response = await fetch(postUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString(),
+            });
+
+            // 读取响应体 (用于控制台输出)
+            let responseBodyText = '';
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const jsonRes = await response.json();
+                responseBodyText = JSON.stringify(jsonRes);
+            } else {
+                responseBodyText = await response.text();
+            }
+            
+            // 终端输出响应状态码和返回体
+            console.log(`[注册响应] 状态码: ${response.status} | 返回体: ${responseBodyText}`);
+            
+            // 成功条件: 状态码为 200
+            if (response.status === 200) {
+                setMessage(`✅ 注册成功! 即将跳转至 /login`);
+                // 跳转到 get: localhost:20508/login
+                window.location.href = 'http://localhost:20508/login';
+            } else {
+                // 失败处理: 终端输出已经做了，用户界面提示错误
+                setMessage(`❌ 注册失败 (HTTP ${response.status})，请检查控制台输出`, true);
+                // 恢复按钮使能（因为失败后可以修改表单重试）
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
+        } catch (err) {
+            console.error(`[注册网络异常]`, err);
+            setMessage(`❌ 请求失败: ${err.message}，请检查后端服务是否正常运行`, true);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+        }
+    });
+
+    // 初始化按钮状态: 刚开始所有字段为空，注册按钮禁用；邮箱验证码按钮可用(但需要填写邮箱)
+    updateRegisterButtonState();
+
+    // 额外优化邮箱验证码: 如果用户在冷却后重新填写邮箱，不清除冷却时间，无额外动作。
+    // 但为避免用户未填邮箱点验证码，已做拦截.
+    // 也支持在注册之前确保email填写后，获取验证码逻辑完成。
+    // 为防止浏览器自动填充造成按钮未激活: 页面加载完成做一次检查
+    window.addEventListener('DOMContentLoaded', () => {
+        updateRegisterButtonState();
+        // 预检密码toggle显示初始样式
+        if (passwordInput.type === 'password') {
+            togglePasswordBtn.textContent = '👁️';
+        }
+        // 额外: 若email已经预填充，可以不做操作，但验证码按钮依然需手动点击
+        console.log("注册页面已加载，后端接口地址: localhost:20509");
+    });
+</script>
+</body>
+</html>

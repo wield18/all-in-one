@@ -9,7 +9,40 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wield18/all-in-one/my-ideas/producer-consumer/consumer"
 )
+
+type Data struct {
+	ID   string
+	Name string
+}
+
+// func TestInitPool(*testing.T) {
+// 	poolServer := InitPool(&config.Pool{1, 1, 2, 1})
+// 	pool := poolServer.Pool
+// 	abc := []int{1, 2, 4, 6}
+// 	pool.BlockSubmit(consumerConfig.Topic_TestRedisWrapper, &consumerConfig.RedisStruct{Key: "goajian", Struct: abc}, func(consumeState int32, err error) {})
+// 	time.Sleep(time.Second)
+// }
+
+func TestSubmitBody(*testing.T) {
+	topic := "gaojian"
+	pool, _ := NewConsumerPool(16, 1, 1, time.Second)
+	pool.RegisterConsumer(topic, consumer.ConsumerFunc(func(ctx context.Context) error {
+		if data, ok := ctx.Value(consumer.DATA).(*Data); ok {
+			fmt.Println(data.ID)
+			fmt.Println(data.Name)
+		} else {
+			fmt.Println("error")
+		}
+		return nil
+	}))
+	pool.Start()
+	pool.Submit(topic, &Data{ID: "123", Name: "gaojian"}, func(consumeState int32, err error) {
+		fmt.Println(consumeState)
+		fmt.Println(err)
+	})
+}
 
 // 其实就是在支持context的同时过程函数还在时不时检查一下是否已经超时
 // 也就有可能消费成功但消费超时了，其实哈这里的 maxProcessTime 没啥用
@@ -74,7 +107,7 @@ func TestChanBase(t *testing.T) {
 func TestGOGOGO(t *testing.T) {
 	topic := "GO"
 	pool, _ := NewConsumerPool(128, 1, 2, 1)
-	pool.RegisterConsumer(topic, ConsumerFunc(func(ctx context.Context) error { return nil }))
+	pool.RegisterConsumer(topic, consumer.ConsumerFunc(func(ctx context.Context) error { return nil }))
 	err := pool.Start()
 	if err != nil {
 		fmt.Println(err)
@@ -190,7 +223,7 @@ func TestStart(t *testing.T) {
 
 func TestSubmit(t *testing.T) {
 	topic := "zxc"
-	consumer := ConsumerFunc(func(ctx context.Context) error { return nil })
+	consumer := consumer.ConsumerFunc(func(ctx context.Context) error { return nil })
 	testCases := []struct {
 		name       string
 		wantErr    error

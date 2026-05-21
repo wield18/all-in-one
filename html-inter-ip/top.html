@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跳转页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Hello?</h1>
+    <h2>🔗 页面跳转</h2>
+    <button id="jumpBtn1">跳转到 localhost:20509/login</button>
+    <button id="jumpBtn2">跳转到 localhost:20509/register</button>
+    <button id="jumpBtn3">跳转到 localhost:20509/update</button>
+    <button id="jumpBtn4">跳转到 localhost:20509/login-out</button>
+    <button id="jumpBtn5">跳转到 localhost:20509/delete</button>
+    <div class="info">点击按钮将跳转到指定页面</div>
+</div>
+
+<script>
+    // 跳转方法
+    function redirectToHome1() {
+        window.location.href = 'http://192.168.33.128:20508/login';
+    }
+    function redirectToHome2() {
+        window.location.href = 'http://192.168.33.128:20508/register';
+    }
+    function redirectToHome3() {
+        window.location.href = 'http://192.168.33.128:20508/update';
+    }
+    function redirectToHome4() {
+        window.location.href = 'http://192.168.33.128:20508/login-out';
+    }
+    function redirectToHome5() {
+        window.location.href = 'http://192.168.33.128:20508/delete';
+    }
+
+    document.getElementById('jumpBtn1').addEventListener('click', redirectToHome1);
+    document.getElementById('jumpBtn2').addEventListener('click', redirectToHome2);
+    document.getElementById('jumpBtn3').addEventListener('click', redirectToHome3);
+    document.getElementById('jumpBtn4').addEventListener('click', redirectToHome4);
+    document.getElementById('jumpBtn5').addEventListener('click', redirectToHome5);
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// Package iox 这就是一个一次读取struct 多次从[]byte 读取
+// Package iox
 package iox
 
 import (
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 )
 
+// JSONReader 这就是一个一次读取struct 多次从[]byte 读取
 type JSONReader struct {
 	val any
 	bf  *bytes.Reader

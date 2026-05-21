@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	widthDevideHeight   = 0.74 // 横竖视频界限
+	widthDevideHeight   = 0.70 // 横竖视频界限
 	V                   = constant.V
 	H                   = constant.H
 	errInvaildParameter = errors.New("Invaild Parameter: 非法参数")

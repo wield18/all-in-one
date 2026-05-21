@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>登录系统 - 安全认证</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        /* 卡片容器 */
+        .login-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 2rem;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.2);
+            width: 100%;
+            max-width: 450px;
+            padding: 2.2rem 2rem 2.5rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 标题区域 */
+        .brand {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .brand h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            background: linear-gradient(120deg, #4f46e5, #a855f7);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .brand p {
+            color: #6c6f78;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        /* 表单样式 */
+        .input-group {
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #1f2937;
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.3px;
+        }
+
+        .input-field {
+            display: flex;
+            align-items: center;
+            background: #f3f4f6;
+            border-radius: 1rem;
+            padding: 0.2rem 1rem;
+            transition: all 0.2s;
+            border: 1.5px solid transparent;
+        }
+
+        .input-field:focus-within {
+            background: #ffffff;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .input-field i {
+            color: #9ca3af;
+            font-style: normal;
+            font-weight: 400;
+            margin-right: 0.6rem;
+            font-size: 1.1rem;
+        }
+
+        .input-field input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 0.85rem 0;
+            font-size: 1rem;
+            outline: none;
+            color: #111827;
+            font-weight: 500;
+        }
+
+        .input-field input::placeholder {
+            color: #a0a5b0;
+            font-weight: 400;
+            font-size: 0.9rem;
+        }
+
+        /* 验证码专用行 */
+        .captcha-wrapper {
+            margin-bottom: 1.5rem;
+            animation: fadeSlideUp 0.3s ease-out;
+            display: none;
+        }
+
+        .captcha-row {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .captcha-row .input-field {
+            flex: 1;
+        }
+
+        .captcha-hint {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+            padding-left: 0.5rem;
+            background: #fef9e3;
+            border-radius: 1rem;
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+        }
+
+        /* 按钮 */
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(95deg, #4f46e5, #9333ea);
+            border: none;
+            padding: 0.9rem;
+            border-radius: 1.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 0.5rem;
+            letter-spacing: 0.5px;
+            box-shadow: 0 8px 14px -6px rgba(79, 70, 229, 0.3);
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -8px rgba(79, 70, 229, 0.4);
+            background: linear-gradient(95deg, #4338ca, #7e22ce);
+        }
+
+        .login-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 提示及脚注 */
+        .error-console-note {
+            font-size: 0.7rem;
+            color: #7c3aed;
+            text-align: center;
+            margin-top: 1.5rem;
+            background: #ede9fe;
+            padding: 0.5rem;
+            border-radius: 2rem;
+        }
+
+        hr {
+            margin: 1rem 0;
+            border-color: #e5e7eb;
+        }
+
+        @keyframes fadeSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            transform: none;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <div class="brand">
+        <h1>欢迎回来</h1>
+        <p>使用 账号/邮箱 安全登录</p>
+    </div>
+
+    <form id="loginForm" action="#" method="post">
+        <!-- 账号 / 邮箱 -->
+        <div class="input-group">
+            <label>用户名 或 电子邮箱</label>
+            <div class="input-field">
+                <i>📧</i>
+                <input type="text" id="loginIdentity" name="identity" placeholder="例如: user@example.com 或 nick" autocomplete="username">
+            </div>
+        </div>
+
+        <!-- 密码 -->
+        <div class="input-group">
+            <label>密码</label>
+            <div class="input-field">
+                <i>🔒</i>
+                <input type="password" id="password" name="password" placeholder="请输入密码" autocomplete="current-password">
+            </div>
+        </div>
+
+        <!-- 动态验证码区域 (初始隐藏) -->
+        <div id="captchaContainer" class="captcha-wrapper">
+            <div class="input-group">
+                <label>验证码 <span style="color:#ef4444;">*</span> <span style="font-weight:normal; font-size:12px;">(6位数字)</span></label>
+                <div class="captcha-row">
+                    <div class="input-field">
+                        <i>🔢</i>
+                        <input type="text" id="captcha" name="captcha" placeholder="6位数字验证码" maxlength="6" autocomplete="off">
+                    </div>
+                </div>
+                <div class="captcha-hint" id="captchaHintMsg">
+                    📬 验证码已发送至邮箱
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="login-btn" id="submitBtn">登 录</button>
+        <div class="error-console-note">
+            ⚡ 系统日志将在控制台输出 (F12)
+        </div>
+    </form>
+</div>
+
+<script>
+    // 全局状态
+    let needCaptchaFlag = false;            // 验证码模式是否激活
+    let preLoginTokenValue = null;          // 存储后端返回的 pre-login-token
+    let confirmedEmailAddress = null;       // ⭐ 关键: 记录后端返回的邮箱地址(第一次 /login-pre 返回的 email 字段)
+    let originalIdentity = '';              // 记录用户最初输入的账号/邮箱，用于二次提交展示但不作为 email 来源
+    let originalPassword = '';              // 暂存密码用于二次提交
+
+    // DOM 元素
+    const form = document.getElementById('loginForm');
+    const identityInput = document.getElementById('loginIdentity');
+    const passwordInput = document.getElementById('password');
+    const captchaContainer = document.getElementById('captchaContainer');
+    const captchaInput = document.getElementById('captcha');
+    const submitBtn = document.getElementById('submitBtn');
+    const captchaHintSpan = document.getElementById('captchaHintMsg');
+
+    // 辅助: 判断邮箱格式
+    function isEmailFormat(str) {
+        if (!str) return false;
+        const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+        return emailRegex.test(str.trim());
+    }
+
+    // 重置验证码UI (隐藏 + 清空内部状态)
+    function resetCaptchaUI() {
+        captchaContainer.style.display = 'none';
+        if (captchaInput) captchaInput.value = '';
+        needCaptchaFlag = false;
+        // 注意: 不清空 confirmedEmailAddress 和 preLoginTokenValue 由调用方决定
+    }
+
+    // 展示验证码区块并显示发送到的邮箱
+    function showCaptchaUI(emailAddr) {
+        captchaContainer.style.display = 'block';
+        needCaptchaFlag = true;
+        if (emailAddr) {
+            captchaHintSpan.innerHTML = `📬 验证码已发送至 ${emailAddr}，请输入6位数字`;
+        } else {
+            captchaHintSpan.innerHTML = `📬 验证码已发送至注册邮箱，请输入6位数字`;
+        }
+        if (captchaInput) captchaInput.focus();
+    }
+
+    // 终端输出封装
+    function terminalLog(type, ...args) {
+        if (type === 'error') {
+            console.error('[登录错误]', ...args);
+        } else if (type === 'info') {
+            console.log('[系统信息]', ...args);
+        } else if (type === 'warn') {
+            console.warn('[登录警告]', ...args);
+        } else {
+            console.log('[响应日志]', ...args);
+        }
+    }
+
+    // 处理第一次 /login-pre 的响应
+    async function handleFirstLoginResponse(response, requestPayload) {
+        const status = response.status;
+        let responseBody;
+        try {
+            responseBody = await response.json();
+        } catch (e) {
+            responseBody = { error: "非JSON响应" };
+        }
+
+        if (!response.ok || (status >= 400 && status <= 599)) {
+            terminalLog('error', `HTTP ${status} 响应体:`, responseBody);
+            alert(`登录请求失败 (${status})，详见控制台输出`);
+            return false;
+        }
+
+        // 200 OK 分支
+        // 情况1: 需要验证码 (包含 email 和 pre-login-token)
+        if (responseBody.hasOwnProperty('pre-login-token') && responseBody.hasOwnProperty('email')) {
+            const emailFromRes = responseBody.email;
+            const preToken = responseBody['pre-login-token'];
+            if (!preToken) {
+                terminalLog('error', '后端返回pre-login-token为空，无法进入验证码流程');
+                alert("服务器异常，未返回验证令牌");
+                return false;
+            }
+            // 存储后端返回的确认邮箱 (重要：后续二次提交必须携带此email)
+            confirmedEmailAddress = emailFromRes;
+            preLoginTokenValue = preToken;
+            // 终端输出: 已经向这个邮箱发送验证码
+            terminalLog('info', `已向邮箱 ${emailFromRes} 发送了6位数字验证码 (pre-login-token已保存)`);
+            // 展示验证码输入栏
+            showCaptchaUI(emailFromRes);
+            return true;  // 表示进入验证码模式，需要二次提交
+        }
+        // 情况2: 直接登录成功 (user-token + id)
+        else if (responseBody.hasOwnProperty('user-token') && responseBody.hasOwnProperty('id')) {
+            const userToken = responseBody['user-token'];
+            const userId = responseBody['id'];
+            if (userToken && userId) {
+                document.cookie = `user-token=${encodeURIComponent(userToken)}; path=/; max-age=86400`;
+                document.cookie = `id=${encodeURIComponent(userId)}; path=/; max-age=86400`;
+                terminalLog('info', `登录成功，携带cookie: user-token, id，即将跳转至 localhost:20508/`);
+                window.location.href = 'http://localhost:20508/';
+                return true;
+            } else {
+                terminalLog('error', '登录成功但缺失token/id字段', responseBody);
+                alert("登录凭证无效");
+                return false;
+            }
+        }
+        else {
+            terminalLog('warn', '收到无法识别的200响应体，未触发验证码也未登录成功', responseBody);
+            alert("登录响应异常，请参考控制台输出");
+            return false;
+        }
+    }
+
+    // 第二步: 提交带验证码的完整表单到 POST /login
+    // ⭐ 关键改动: 无论第一次提交的是邮箱还是名称，第二次提交时 email 字段必须使用后端返回的 confirmedEmailAddress
+    // 同时 name 字段根据原始输入是否为邮箱格式决定: 如果原始输入是非邮箱格式则 name = 原始输入，否则 name = ''
+    // 且必须携带 password 和 captcha
+    async function submitWithCaptcha(identity, password, captchaCode) {
+        if (!captchaCode || captchaCode.trim() === '') {
+            alert("请输入6位数字验证码");
+            return false;
+        }
+        if (!preLoginTokenValue) {
+            alert("验证令牌丢失，请刷新页面重新登录");
+            resetCaptchaUI();
+            return false;
+        }
+        if (!confirmedEmailAddress) {
+            alert("邮箱信息缺失，请重新登录");
+            resetCaptchaUI();
+            return false;
+        }
+
+        // 构造符合后端 UserV1_passwordRequired 结构的 form-data (x-www-form-urlencoded)
+        // 字段: name, password, email, captcha
+        // 重要: email 字段必须是后端第一次返回的 confirmedEmailAddress
+        // name 字段: 如果原始输入(identity) 是邮箱格式，则 name 为空字符串；否则 name = identity (用户名)
+        const isIdentityEmail = isEmailFormat(identity);
+        let nameValue = '';
+        if (!isIdentityEmail) {
+            nameValue = identity;   // 名称登录
+        } // 否则 name 保持空字符串
+
+        const requestData = {
+            name: nameValue,
+            password: password,
+            email: confirmedEmailAddress,   // ⭐ 强制携带后端返回的邮箱
+            captcha: captchaCode.trim()
+        };
+
+        terminalLog('info', '二次提交请求体（携带后端确认邮箱）:', requestData);
+
+        try {
+            const response = await fetch('http://localhost:20509/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'pre-login-token': preLoginTokenValue
+                },
+                body: new URLSearchParams(requestData).toString()
+            });
+
+            const status = response.status;
+            let responseBody;
+            try {
+                responseBody = await response.json();
+            } catch (err) {
+                responseBody = { error: "非json响应" };
+            }
+
+            if (!response.ok || (status >= 400 && status <= 599)) {
+                terminalLog('error', `第二次登录失败 (HTTP ${status}) 响应体:`, responseBody);
+                alert(`登录失败 (${status})，请查看控制台输出`);
+                return false;
+            }
+
+            // 200 OK 分支: 期望 {user-token, id}
+            if (responseBody.hasOwnProperty('user-token') && responseBody.hasOwnProperty('id')) {
+                const userToken = responseBody['user-token'];
+                const userId = responseBody['id'];
+                document.cookie = `user-token=${encodeURIComponent(userToken)}; path=/; max-age=86400`;
+                document.cookie = `id=${encodeURIComponent(userId)}; path=/; max-age=86400`;
+                terminalLog('info', `验证码登录成功，跳转至 localhost:20508/`);
+                window.location.href = 'http://localhost:20508/';
+                return true;
+            } else {
+                terminalLog('warn', '第二次登录后端返回非成功结构', responseBody);
+                alert("登录失败: " + (responseBody.message || "未知错误"));
+                return false;
+            }
+        } catch (err) {
+            terminalLog('error', '网络错误或请求异常', err);
+            alert("网络错误，请检查后端服务是否启动");
+            return false;
+        }
+    }
+
+    // 第一步: POST /login-pre 处理初始登录（名称/邮箱+密码）
+    // 成功后可能返回验证码模式或者直接登录成功
+    async function submitFirstStage(identity, password) {
+        if (!identity.trim()) {
+            alert("请输入用户名或邮箱");
+            return false;
+        }
+        if (!password.trim()) {
+            alert("请输入密码");
+            return false;
+        }
+
+        const isEmail = isEmailFormat(identity);
+        // 构造 application/x-www-form-urlencoded 表单
+        const formBody = new URLSearchParams();
+        if (isEmail) {
+            formBody.append('email', identity);
+            formBody.append('name', '');
+        } else {
+            formBody.append('name', identity);
+            formBody.append('email', '');
+        }
+        formBody.append('password', password);
+
+        try {
+            const response = await fetch('http://localhost:20509/login-pre', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formBody.toString()
+            });
+
+            let responseData;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                responseData = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    responseData = JSON.parse(text);
+                } catch {
+                    responseData = { raw: text };
+                }
+            }
+
+            if (!response.ok) {
+                terminalLog('error', `/login-pre 错误 ${response.status}`, responseData);
+                alert(`请求失败 (${response.status})，控制台查看详情`);
+                return false;
+            }
+
+            // 处理响应: 优先判断是否需要验证码 (包含 email + pre-login-token)
+            if (responseData.hasOwnProperty('pre-login-token') && responseData.hasOwnProperty('email')) {
+                const userEmail = responseData.email;
+                const preToken = responseData['pre-login-token'];
+                preLoginTokenValue = preToken;
+                confirmedEmailAddress = userEmail;   // ⭐ 存储后端确认的邮箱
+                originalIdentity = identity;          // 保存原始输入供二次提交时确定name字段
+                originalPassword = password;
+                terminalLog('info', `已向邮箱 ${userEmail} 发送6位数字验证码，pre-login-token已保存`);
+                showCaptchaUI(userEmail);
+                return true;   // 进入验证码模式
+            }
+            else if (responseData.hasOwnProperty('user-token') && responseData.hasOwnProperty('id')) {
+                // 直接登录成功
+                const userToken = responseData['user-token'];
+                const userId = responseData['id'];
+                document.cookie = `user-token=${encodeURIComponent(userToken)}; path=/; max-age=86400`;
+                document.cookie = `id=${encodeURIComponent(userId)}; path=/; max-age=86400`;
+                terminalLog('info', `登录成功，跳转至 localhost:20508/`);
+                window.location.href = 'http://localhost:20508/';
+                return true;
+            }
+            else {
+                terminalLog('warn', '未预期的响应结构', responseData);
+                alert("服务器返回异常，无法处理登录");
+                return false;
+            }
+        } catch (err) {
+            terminalLog('error', '网络错误，连接后端失败', err);
+            alert("网络错误，请确保后端运行在 localhost:20509");
+            return false;
+        }
+    }
+
+    // 主表单提交逻辑: 根据状态(needCaptchaFlag)决定调用第一步或者第二步
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const identity = identityInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        // 防止多次快速点击，2秒后恢复 (如果页面未跳转)
+        const restoreBtn = () => { submitBtn.disabled = false; };
+        setTimeout(restoreBtn, 2500);
+
+        try {
+            // 场景1: 尚未进入验证码模式 -> 调用 /login-pre
+            if (!needCaptchaFlag) {
+                // 清理残留可能来自上一次的验证码令牌，避免干扰
+                if (preLoginTokenValue || confirmedEmailAddress) {
+                    // 重置一些旧的验证码状态
+                    preLoginTokenValue = null;
+                    confirmedEmailAddress = null;
+                    resetCaptchaUI();
+                }
+                await submitFirstStage(identity, password);
+            } 
+            else {
+                // 场景2: 验证码模式已激活 (needCaptchaFlag === true)
+                const captchaCode = captchaInput ? captchaInput.value.trim() : '';
+                if (!captchaCode) {
+                    alert("请输入6位数字验证码");
+                    submitBtn.disabled = false;
+                    return;
+                }
+                if (!preLoginTokenValue || !confirmedEmailAddress) {
+                    alert("会话信息缺失，请刷新页面重新登录");
+                    resetCaptchaUI();
+                    preLoginTokenValue = null;
+                    confirmedEmailAddress = null;
+                    needCaptchaFlag = false;
+                    submitBtn.disabled = false;
+                    return;
+                }
+                // 提交二次登录: 务必使用原始输入的 identity 来决定name字段，并且 email 使用 confirmedEmailAddress
+                await submitWithCaptcha(originalIdentity || identity, originalPassword || password, captchaCode);
+            }
+        } catch (error) {
+            console.error("提交过程异常", error);
+            alert("登录过程出现异常，请重试");
+        } finally {
+            // 如果由于某些原因没有跳转且按钮被禁用，尝试恢复 (但注意如果进入验证码模式，按钮仍然需要可点)
+            // 只在非跳转后恢复，为了体验，如果needCaptchaFlag为true且页面未跳转, 确保按钮可用.
+            setTimeout(() => {
+                if (submitBtn && submitBtn.disabled === true) {
+                    submitBtn.disabled = false;
+                }
+            }, 1000);
+        }
+    });
+
+    // 重置全局 (页面初始化)
+    function initialReset() {
+        needCaptchaFlag = false;
+        preLoginTokenValue = null;
+        confirmedEmailAddress = null;
+        originalIdentity = '';
+        originalPassword = '';
+        if (captchaContainer) captchaContainer.style.display = 'none';
+        if (captchaInput) captchaInput.value = '';
+    }
+    initialReset();
+
+    // 监听身份输入变化: 如果处于验证码模式并修改了账号，重置流程 (防止混淆)
+    identityInput.addEventListener('input', () => {
+        if (needCaptchaFlag) {
+            if (confirm("检测到您更改了登录账号，需要重新开始登录流程，是否重置？")) {
+                // 重置所有验证码相关状态
+                needCaptchaFlag = false;
+                preLoginTokenValue = null;
+                confirmedEmailAddress = null;
+                originalIdentity = '';
+                originalPassword = '';
+                captchaContainer.style.display = 'none';
+                if (captchaInput) captchaInput.value = '';
+                terminalLog('info', '已重置验证码模式，请重新点击登录');
+            }
+        }
+    });
+
+    // 额外保证: 如果密码框变化并且处于验证码模式，不重置，但保留原先状态（不影响邮箱）
+    // 但为了严谨不做额外动作
+</script>
+</body>
+</html>

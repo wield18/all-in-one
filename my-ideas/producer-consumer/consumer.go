@@ -5,30 +5,46 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/wield18/all-in-one/config"
+	consumerFunc "github.com/wield18/all-in-one/config/consumer"
+	"github.com/wield18/all-in-one/my-ideas/producer-consumer/consumer"
+	"github.com/wield18/all-in-one/my-ideas/producer-consumer/types"
 )
 
-var (
-	buffLen  = 2048
-	errPanic = errors.New("Panic")
-	DATA     = "data"
-)
+var poolServer = &PoolServer{}
 
-type PanicError struct {
-	Value interface{}
-	Stack string
+type PoolServer struct {
+	Pool *ConsumerPool
 }
 
-func (e *PanicError) Error() string {
-	return fmt.Sprintf("panic: %v\n%s", e.Value, e.Stack)
+// 暴露出生化方法
+func InitPool(conf *config.Pool) *PoolServer {
+
+	pool, err := NewConsumerPool(conf.QueueSize, conf.CorGo, conf.MaxGo, conf.MaxIdleGoTime)
+	if err != nil {
+		panic(err.Error())
+	}
+	// topic 跟对应的 consumeFunc 得注册
+	aMap := consumerFunc.GetConsumerMap()
+	for topic, fun := range aMap {
+		err := pool.RegisterConsumer(topic, fun)
+		fmt.Printf("topic: %s init success\n", topic)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+	pool.Start()
+	poolServer.Pool = pool
+	return poolServer
 }
 
-func (e *PanicError) Is(target error) bool {
-	_, ok := target.(*PanicError)
-	return ok
+// 引用获得
+func GetPoolServer() *PoolServer {
+	return poolServer
 }
 
 // 真正运行时的各种状态
@@ -39,37 +55,6 @@ var (
 	dead     int32 = 3
 	locked   int32 = 4
 )
-
-// 具体所有consume的状态
-var (
-	consumeCreated int32 = 0
-	consumeSuccess int32 = 1
-	consumeError   int32 = 2
-	consumePanic   int32 = 3
-)
-
-type Consumer interface {
-	Consume(ctx context.Context) error
-}
-
-type ConsumerFunc func(ctx context.Context) error
-
-func (c ConsumerFunc) Consume(ctx context.Context) error { return c(ctx) }
-
-type ConsumerFuncWrapper struct {
-	Consumer Consumer
-}
-
-func (c *ConsumerFuncWrapper) Consume(ctx context.Context) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			buf := make([]byte, buffLen)
-			buf = buf[:runtime.Stack(buf, false)]
-			err = &PanicError{Value: errPanic, Stack: string(buf)}
-		}
-	}()
-	return c.Consumer.Consume(ctx)
-}
 
 type ConsumerPool struct {
 	Group           sync.Map // 只暴露一个Group 其他内部管理
@@ -166,22 +151,23 @@ func (p *ConsumerPool) goroutine(id int) {
 				atomic.AddInt32(&p.currentPoolSize, -1)
 				return
 			}
-			var fun Consumer
-			consuemr, ok := p.Group.Load(data.Topic)
+			var fun consumer.Consumer
+			oneConsuemr, ok := p.Group.Load(data.Topic)
 			if !ok {
 				fmt.Printf("%v: %s", errTopicIsNotFound, data.Topic)
 				continue
 			}
-			fun = consuemr.(Consumer)
-			err := fun.Consume(p.ctx)
+			fun = oneConsuemr.(consumer.Consumer)
+			ctx := context.WithValue(p.ctx, consumer.DATA, data.Data)
+			err := fun.Consume(ctx)
 			if err != nil {
-				if errors.Is(err, &PanicError{}) {
-					data.State = consumePanic
+				if errors.Is(err, &types.PanicError{}) {
+					data.State = consumer.ConsumePanic
 				} else {
-					data.State = consumeError
+					data.State = consumer.ConsumeError
 				}
 			} else {
-				data.State = consumeSuccess
+				data.State = consumer.ConsumeSuccess
 			}
 			data.CallBack(data.State, err)
 
@@ -203,6 +189,22 @@ func (p *ConsumerPool) goroutine(id int) {
 	}
 }
 
+// 阻塞发送,所有data的传递必须是指针传递,当然值传递也无妨,只要对应的解析consumer也是值解构,我自己规定指针传递
+func (p *ConsumerPool) BlockSubmit(topic string, data interface{},
+	callBack func(consumeState int32, err error)) error {
+	for {
+		err := p.Submit(topic, data, callBack)
+		if err == nil {
+			return nil
+		} else if err == errQueueFull || err == errStateLocked { // 可重试的
+			continue
+		} else {
+			return err
+		}
+
+	}
+}
+
 func (p *ConsumerPool) Submit(topic string, data interface{},
 	callBack func(consumeState int32, err error)) error {
 	if topic == "" {
@@ -212,7 +214,13 @@ func (p *ConsumerPool) Submit(topic string, data interface{},
 		return errCallBackIsNil
 	}
 	if _, ok := p.Group.Load(topic); !ok {
-		return errTopicIsNotFound
+		// p.Group.Range(func(key, value interface{}) bool {
+		// 	fmt.Println("看这里-------------------")
+		// 	fmt.Printf("key: %v\n", key)
+		// 	// 返回 true 继续遍历，返回 false 停止遍历
+		// 	return true
+		// })
+		return fmt.Errorf("%w: %s", errTopicIsNotFound, topic)
 	}
 
 	state := atomic.LoadInt32(&p.state)
@@ -223,7 +231,7 @@ func (p *ConsumerPool) Submit(topic string, data interface{},
 	da := &SubmitData{
 		Topic:    topic,
 		Data:     data,
-		State:    consumeCreated,
+		State:    consumer.ConsumeCreated,
 		CallBack: callBack,
 	}
 	if atomic.CompareAndSwapInt32(&p.state, created, locked) {
@@ -299,15 +307,23 @@ func (p *ConsumerPool) ShutDown() error {
 	}
 }
 
-func (p *ConsumerPool) RegisterConsumer(topic string, consumer Consumer) error {
+func (p *ConsumerPool) RegisterConsumer(topic string, oneConsumer consumer.Consumer) error {
+	// 先查一遍
 	if _, ok := p.Group.Load(topic); ok {
 		return fmt.Errorf("%w: %s", errTopicAlreadyRegisted, topic)
 	}
-	consumer = &ConsumerFuncWrapper{Consumer: consumer}
-	p.Group.Store(topic, consumer)
+	oneConsumer = &consumer.ConsumerFuncWrapper{Consumer: oneConsumer}
+	p.Group.Store(topic, oneConsumer)
+	p.Group.Range(func(key, value interface{}) bool {
+		fmt.Println("看这里-------------------")
+		fmt.Printf("key: %v\n", key)
+		// 返回 true 继续遍历，返回 false 停止遍历
+		return true
+	})
 	return nil
 }
 
-func (p *ConsumerPool) UpdateConsumer(topic string, consumer Consumer) {
-	p.Group.Store(topic, consumer)
+func (p *ConsumerPool) UpdateConsumer(topic string, oneConsumer consumer.Consumer) {
+	oneConsumer = &consumer.ConsumerFuncWrapper{Consumer: oneConsumer}
+	p.Group.Store(topic, oneConsumer)
 }

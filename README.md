@@ -18,7 +18,7 @@ git clone https://github.com/wield18/all-in-one.git
 cd ./all-in-one
 ```
 
-依照 `./config/config.tempalte.yaml` 创建 `./config/config.yaml` 并将 `videoRoot` 属性改为你的视频文件夹路径。确保你有足够多的竖视频(宽高比小于3/4)才能获得最好效果
+依照 `./config/config.tempalte.yaml` 创建 `./config/config.yaml` 并将 `videoRoot` 属性改为你的视频文件夹路径。确保你有足够多的竖视频(宽高比小于3/4)才能获得最好效果,至少一个,而且必须下载ffmpeg
 
 ```bash
 go mod tidy

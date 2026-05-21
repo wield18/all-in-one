@@ -12,21 +12,18 @@ import (
 )
 
 // DB 全局数据库连接实例
-type MDBServer struct {
+type DBServer struct {
 	DB *gorm.DB
 }
 
-var mdb = MDBServer{}
+// 本地引用
+var mdb = &DBServer{}
 
-func GetMDBServer() *MDBServer {
-	return &mdb
+func GetDBServer() *DBServer {
+	return mdb
 }
 
-func GetMDB() *gorm.DB {
-	return mdb.DB
-}
-
-func NewMDBServer(dbConfig *config.Mysql) *MDBServer {
+func InitMDBServer(dbConfig *config.Mysql) *DBServer {
 	// var dbConfig = config.Config.Db
 
 	// 构建数据库连接DSN(数据源名称)
@@ -69,10 +66,9 @@ func NewMDBServer(dbConfig *config.Mysql) *MDBServer {
 
 	// 写入
 	mdb.DB = db
-	return &mdb
+	return mdb
 }
 
-func (db *MDBServer) Shutdown() error {
-
+func (db *DBServer) Shutdown() error {
 	return nil
 }

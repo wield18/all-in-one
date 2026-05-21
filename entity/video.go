@@ -7,11 +7,13 @@ type Window struct {
 	Width  float64 `form:"width"`
 }
 
+// 视频索引
 type VideoIndex struct {
 	Index      string `form:"index"`
 	Resolution string `form:"resolution"`
 }
 
+// 视频索引对应切片
 type VideoSlice struct {
 	Index      string `form:"index"`
 	Resolution string `form:"resolution"`
